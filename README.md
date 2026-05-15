@@ -24,7 +24,7 @@ Deployed and configured an **OpenLDAP** directory service on Ubuntu Server — a
 
 1. **Provisioned a Ubuntu Server 26.04 LTS VM** in VMware Fusion
 2. **Installed and configured OpenLDAP (slapd)** with a custom domain
-3. **Configured the LDAP directory** with domain `homelab.local`
+3. **Configured the LDAP directory** with domain `homelab.local.org`
 4. **Created an Organizational Unit (OU)** to structure user accounts
 5. **Provisioned user accounts** using LDIF files
 6. **Verified directory entries** using `ldapsearch` queries
@@ -42,26 +42,26 @@ sudo dpkg-reconfigure slapd
 sudo systemctl status slapd
 
 # Query the directory
-ldapsearch -x -LLL -H ldap:/// -b "dc=homelab,dc=local"
+ldapsearch -x -LLL -H ldap:/// -b "dc=homelab,dc=local,dc=org"
 
 # Add users via LDIF
-ldapadd -x -D "cn=admin,dc=homelab,dc=local" -W -f adduser.ldif
+ldapadd -x -D "cn=admin,dc=homelab,dc=local,dc=org" -W -f adduser.ldif
 ```
 
 ### Sample LDIF — User Provisioning
 
 ```ldif
-dn: ou=users,dc=homelab,dc=local
+dn: ou=users,dc=homelab,dc=local,dc=org
 objectClass: organizationalUnit
 ou: users
 
-dn: cn=John Smith,ou=users,dc=homelab,dc=local
+dn: cn=Kevin Durant,ou=users,dc=homelab,dc=local,dc=org
 objectClass: inetOrgPerson
-cn: John Smith
-sn: Smith
-givenName: John
-mail: john.smith@homelab.local
-userPassword: Password123
+cn: Kevin Durant
+sn: Durant
+givenName: Kevin
+mail: kevin.durant@homelab.local.org
+userPassword: Treysongz#1
 ```
 
 ### IAM Concepts Demonstrated
