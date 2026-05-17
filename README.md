@@ -399,9 +399,151 @@ Initial sync failed because UUID, Username, and RDN attributes were set to `uid`
 
 ---
 
+## ✅ Phase 4: Multi-VM Environment & Centralized Authentication
+
+### What I Built
+Provisioned a second Ubuntu Server VM (`iam-client-01`) and joined it to the OpenLDAP domain, enabling centralized authentication across multiple machines — simulating a real enterprise environment where employees use one set of credentials to log into any company machine.
+
+### Architecture
+
+```
+MacBook Air (Host)
+└── VMware Fusion
+    ├── homelab-server (172.16.103.129)
+    │   ├── OpenLDAP (port 389) ← Central Directory
+    │   └── Keycloak (port 8080) ← Identity Provider
+    └── iam-client-01
+        └── LDAP Client → authenticates against homelab-server
+```
+
+### Steps Completed
+
+**Step 1 — Provisioned Second VM**
+- Created a new Ubuntu Server 26.04 LTS VM in VMware Fusion
+- Named the server `iam-client-01`
+- Installed OpenSSH Server during setup
+- Updated all packages after installation
+
+**Step 2 — Configured DNS**
+Added Google DNS to `/etc/resolv.conf` to enable internet access:
+```
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+```
+Verified connectivity with `ping -c 4 google.com` — 0% packet loss
+
+**Step 3 — Installed LDAP Client Packages**
+```bash
+sudo apt install libnss-ldap libpam-ldap ldap-utils nscd -y
+```
+
+During configuration selected **passwd**, **group**, and **shadow** as the name services to enable LDAP lookups for.
+
+**Step 4 — Configured nslcd to Point to LDAP Server**
+
+Edited `/etc/nslcd.conf` to point to the OpenLDAP server:
+```bash
+sudo nano /etc/nslcd.conf
+```
+
+Key settings:
+```
+uri ldap://172.16.103.129
+base dc=homelab,dc=local,dc=org
+```
+
+Restarted the service:
+```bash
+sudo systemctl restart nslcd
+```
+
+**Step 5 — Added Unix Attributes to Kevin Durant (on homelab-server)**
+
+Linux requires `uidNumber`, `gidNumber`, `homeDirectory` and `loginShell` to recognize LDAP users. Added the `posixAccount` objectClass and required attributes to Kevin Durant's LDAP entry:
+
+```bash
+sudo nano updatekevin.ldif
+```
+
+```ldif
+dn: cn=Kevin Durant,ou=users,dc=homelab,dc=local,dc=org
+changetype: modify
+add: objectClass
+objectClass: posixAccount
+-
+add: uid
+uid: kevin.durant
+-
+add: uidNumber
+uidNumber: 10001
+-
+add: gidNumber
+gidNumber: 10001
+-
+add: homeDirectory
+homeDirectory: /home/kevin.durant
+-
+add: loginShell
+loginShell: /bin/bash
+```
+
+```bash
+ldapmodify -x -D "cn=admin,dc=homelab,dc=local,dc=org" -W -f updatekevin.ldif
+```
+
+**Step 6 — Verified LDAP User Visible on Client VM**
+
+On `iam-client-01`:
+```bash
+getent passwd | grep "kevin"
+# Output: kevin.durant:*:10001:10001:Kevin Durant:/home/kevin.durant:/bin/bash
+```
+
+**Step 7 — Enabled LDAP Authentication via PAM**
+
+Created home directory for Kevin Durant:
+```bash
+sudo mkdir -p /home/kevin.durant
+sudo chown 10001:10001 /home/kevin.durant
+```
+
+Ran PAM configuration:
+```bash
+sudo pam-auth-update
+```
+
+Enabled the following PAM profiles:
+- ✅ Unix authentication
+- ✅ LDAP Authentication
+- ✅ Register user sessions in the systemd control group hierarchy
+- ✅ Create home directory on login
+- ✅ Inheritable Capabilities Management
+
+**Step 8 — Successfully Logged in as Kevin Durant**
+
+```bash
+su - kevin.durant
+# Output: kevin.durant@iam-client-01:~$
+
+whoami
+# Output: kevin.durant
+```
+
+Kevin Durant successfully authenticated on `iam-client-01` using credentials stored on `homelab-server` OpenLDAP — centralized authentication working across two VMs!
+
+### IAM Concepts Demonstrated
+- **Centralized Authentication** — One set of credentials works across multiple machines
+- **LDAP Client Configuration** — Joining a Linux machine to an LDAP domain
+- **PAM (Pluggable Authentication Modules)** — Configuring Linux authentication stack
+- **NSS (Name Service Switch)** — Routing identity lookups to LDAP
+- **posixAccount** — Unix/Linux user attributes required for system login
+- **Multi-machine IAM** — Simulating enterprise environment with multiple servers
+- **Troubleshooting** — Resolving objectClass violations and missing attributes
+
+---
+
 ## 🚧 Coming Soon
 
-- [ ] **Multi-VM Environment** — Joining a second VM to the LDAP domain
 - [ ] **SAML Integration** — Federated identity management
 
 ---
@@ -413,6 +555,7 @@ This homelab is designed to build practical, demonstrable IAM skills including:
 - Identity lifecycle management (provision, modify, deprovision)
 - Single Sign-On (SSO) configuration
 - Role-Based Access Control (RBAC)
+- Multi-machine centralized authentication
 - Industry-standard protocols: LDAP, OAuth2, OIDC, SAML
 
 ---
